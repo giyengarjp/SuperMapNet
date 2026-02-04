@@ -4,7 +4,6 @@ from shapely import affinity
 from shapely.geometry import LineString, box
 from tools.anno_converter.bezier import PiecewiseBezierCurve
 
-
 class RasterizedLocalMap(object):
     def __init__(self, patch_size, canvas_size, num_degrees, max_channel, thickness, patch_angle=0.0, bezier=False):
         super().__init__()
