@@ -1,12 +1,19 @@
 #!/usr/bin/env bash
+# CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 bash run.sh train-continue pivotnet_nuscenes_swint_dense 30 1 8 /workspace/SuperMapNet/outputs/pivotnet_nuscenes_swint_dense/pivotnet_nuscenes_swint_dense_e30_b1_g8-2026-01-23T04:58:43/dump_model/checkpoint_epoch_14.pth
+# CUDA_VISIBLE_DEVICES=0 bash run.sh test pivotnet_nuscenes_swint_dense outputs/pivotnet_nuscenes_swint_dense/latest/dump_model/checkpoint_epoch_29.pth
 
-export PYTHONPATH=$(pwd)
+#export PYTHONPATH=$(pwd)
+export PYTHONPATH=$(pwd):$PYTHONPATH:/usr/lib/python3.8/site-packages
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/python3.8/dist-packages/torch/lib
 
 case "$1" in
     "train")
         CONFIG_NAME=$2
         NUM_EPOCHS=$3
-        python3  configs/"${CONFIG_NAME}".py -d 0-3 -b 1 -e ${NUM_EPOCHS} --sync_bn 4 --no-clearml
+        BATCH_SIZE=$4
+        NUM_GPU=$5
+        python3  configs/"${CONFIG_NAME}".py --experiment_name ${CONFIG_NAME}_e${NUM_EPOCHS}_b${BATCH_SIZE}_g${NUM_GPU} -d 0-$((NUM_GPU-1)) -b ${BATCH_SIZE} -e ${NUM_EPOCHS} --sync_bn ${NUM_GPU} --no-clearml
+        # python3  configs/"${CONFIG_NAME}".py -d 0-3 -b 1 -e ${NUM_EPOCHS} --sync_bn 4 --no-clearml
         ;;
     "test")
         CONFIG_NAME=$2
@@ -15,8 +22,11 @@ case "$1" in
         ;;
     "train-continue")
         CONFIG_NAME=$2
-        CKPT=$3
-        python3 configs/"${CONFIG_NAME}".py -d 0-3 -b 1 -e 30 --sync_bn 4 --no-clearml --ckpt "${CKPT}"  
+        NUM_EPOCHS=$3
+        BATCH_SIZE=$4
+        NUM_GPU=$5
+        CKPT=$6
+        python3 configs/"${CONFIG_NAME}".py -d 0-$((NUM_GPU-1)) -b ${BATCH_SIZE} -e 30 --sync_bn ${NUM_GPU} --no-clearml --ckpt "${CKPT}"
         ;;
     "pipeline")
         CONFIG_NAME=$2

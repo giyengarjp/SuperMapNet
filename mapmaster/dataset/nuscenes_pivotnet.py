@@ -3,9 +3,6 @@ import numpy as np
 import pickle as pkl
 from PIL import Image
 from torch.utils.data import Dataset
-from .rasterize import RasterizedLocalMap
-from .vectorize import VectorizedLocalMap
-from .generate_pivots import GenPivots
 from nuscenes import NuScenes
 from pyquaternion import Quaternion
 from skimage import io as skimage_io
@@ -16,11 +13,20 @@ import open3d as o3d
 from functools import reduce
 import torch
 import random
-from .voxel import pad_or_trim_to_np
-from .visual import visual_map_gt
 from PIL import Image
 
- 
+# from .rasterize import RasterizedLocalMap
+# from .vectorize import VectorizedLocalMap
+# from .generate_pivots import GenPivots
+# from .voxel import pad_or_trim_to_np
+# from .visual import visual_map_gt
+
+from mapmaster.dataset.rasterize import RasterizedLocalMap
+from mapmaster.dataset.vectorize import VectorizedLocalMap
+from mapmaster.dataset.generate_pivots import GenPivots
+from mapmaster.dataset.voxel import pad_or_trim_to_np
+from mapmaster.dataset.visual import visual_map_gt
+
 class NuScenesMapDataset(Dataset):
     def __init__(self, img_key_list, map_conf, point_conf,  transforms,  data_split="training"):
         super().__init__()
@@ -198,12 +204,29 @@ class NuScenesMapDataset(Dataset):
         lidar_data = self.get_lidar_data( self.nusc, rec, nsweeps=nsweeps, min_distance=2.2)
         lidar_data_original = torch.Tensor(lidar_data)[:3]
         return lidar_data_original
-      
+    
+    def _yaw_from_quat(self, q_list):
+        # q_list: [w, x, y, z] as stored by nuScenes
+        q = Quaternion(q_list)
+        R = q.rotation_matrix
+        return float(np.arctan2(R[1, 0], R[0, 0]))
+
+    def _frame_index_in_scene(self, scene, sample_rec):
+        tok = scene['first_sample_token']
+        k = 0
+        while tok and tok != sample_rec['token']:
+            s = self.nusc.get('sample', tok)
+            tok = s['next']
+            k += 1
+        return k
+
     def __getitem__(self, idx: int):
-        from av2.geometry.se3 import SE3
+        # from av2.geometry.se3 import SE3
         token = self.tokens[idx]
         
         record = self.nusc.sample[idx]
+        scene = self.nusc.get('scene', record['scene_token'])
+        frame_idx = self._frame_index_in_scene(scene, record)
         location = self.nusc.get('log', self.nusc.get('scene', record['scene_token'])['log_token'])['location']
         ego_pose = self.nusc.get('ego_pose', self.nusc.get('sample_data', record['data']['LIDAR_TOP'])['ego_pose_token'])
 
@@ -219,7 +242,7 @@ class NuScenesMapDataset(Dataset):
         #print(imgs[0].shape)#(900, 1600, 3)
       
         item = dict(images=imgs, targets=targets, lidars=lidar_data,  lidar_mask= lidar_mask, 
-                    extra_infos=dict(token=token, map_size=self.ego_size),
+                    extra_infos=dict(token=token, map_size=self.ego_size, ego_pose=ego_pose, scene=scene, frame_index=frame_idx),
                     extrinsic=np.stack(extrins, axis=0), intrinsic=np.stack(intrins, axis=0))
         #print(lidar_data.size())
         if self.transforms is not None:
@@ -241,3 +264,77 @@ class NuScenesMapDataset(Dataset):
 
     def __len__(self):
         return len(self.tokens)
+
+if __name__ == "__main__":
+
+    from torchvision.transforms import Compose
+    from mapmaster.dataset.transform import Resize, Normalize, ToTensor_Pivot
+    from mapmaster.dataset.nuscenes_visualize import visualize_sample
+    map_conf = dict(
+        version = 'v1.0-trainval',
+        # version = 'v1.0-mini',
+        dataset_name="nuscenes",
+        nusc_root='/workspace/nuscenes/',
+        split_dir="assets/splits/nuscenes",
+        num_classes=3,
+        ego_size=(120, 30),
+        map_region=(-60, 60, -15, 15),
+        map_resolution=0.15,
+        map_size=(800, 200),
+        mask_key="instance_mask8",
+        line_width=8,
+        save_thickness=1,
+    )
+
+    pivot_conf = dict(
+        max_pieces=(10, 2, 30),   # max num of pts in divider / ped / boundary]  #10, 2, 30
+    )
+
+    dataset_setup = dict(
+        img_key_list=["CAM_FRONT_LEFT", "CAM_FRONT", "CAM_FRONT_RIGHT", "CAM_BACK_LEFT", "CAM_BACK", "CAM_BACK_RIGHT"],
+        img_norm_cfg=dict(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], to_rgb=True),
+        input_size=(896, 512),  #cv2  W, H
+    )
+
+    transform = Compose(
+        [
+            Resize(img_scale=dataset_setup["input_size"]),
+            Normalize(**dataset_setup["img_norm_cfg"]),
+            ToTensor_Pivot(),
+        ]
+    )
+
+    test_set = NuScenesMapDataset(
+        img_key_list=dataset_setup["img_key_list"],
+        map_conf=map_conf,
+        point_conf=pivot_conf,
+        transforms=transform,
+        data_split="val_sub",
+    )
+
+    sampler = None
+    test_loader = torch.utils.data.DataLoader(
+        test_set,
+        batch_size=1,
+        pin_memory=True,
+        num_workers=1,
+        shuffle=False,
+        drop_last=False,
+        sampler=sampler,
+    )
+
+    test_dataset_size = len(test_set)
+    print(f"✓ Test dataset size: {test_dataset_size}")
+    for i, data in enumerate(test_loader):
+        
+    # if i%10==0:
+        out_path = f"/workspace/SuperMapNet/viz_outputs/{i}"
+        points_dict = data["targets"]["points"]
+        vlen_dict   = data["targets"]["valid_len"]
+        points_np = {k: v[0].cpu().numpy() for k, v in points_dict.items()}
+        vlen_np   = {k: v[0].cpu().numpy() for k, v in vlen_dict.items()}
+        # out_path_file = f"/workspace/SuperMapNet/viz_outputs/{i}/polyline.npz"
+        # np.savez(out_path_file, points=points_np, valid_len=vlen_np)
+        print(f"{data['extra_infos']['scene']['name']}: {data['extra_infos']['frame_index']}")
+        print()
+        # visualize_sample(data, out_dir=out_path)

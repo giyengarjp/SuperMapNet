@@ -16,18 +16,18 @@ from mapmaster.utils.misc import get_param_groups, is_distributed
 from tools.evaluation.eval import compute_one_ap
 from tools.evaluation.ap import instance_mask_ap as get_batch_ap
 from mapmaster.dataset.visual import visual_map_pred
+import matplotlib.pyplot as plt
 
-    
 class EXPConfig:
     
     DATA_ROOT = './data/nuscenes/'
-    
     IMAGE_SHAPE = (900, 1600)   # H, W
 
     map_conf = dict(
         version = 'v1.0-trainval',
+        # version = 'v1.0-mini',
         dataset_name="nuscenes",
-        nusc_root='./data/nuscenes/',
+        nusc_root='/workspace/nuscenes/',
         split_dir="assets/splits/nuscenes",
         num_classes=3,
         ego_size=(120, 30),
@@ -88,8 +88,6 @@ class EXPConfig:
                 image_order=[2, 1, 0, 5, 4, 3]
             )
         ),
-       
-       
         lidar_encoder=dict(
             arch_name="pointpillar_encoder",
             net_kwargs=dict(
@@ -112,7 +110,8 @@ class EXPConfig:
             )
         ),
         fusion_encoder=dict(
-            arch_name="ConcatBEV",  #ConcatBEV, BevFusionEncoder
+            # arch_name="ConcatBEV",  #ConcatBEV, BevFusionEncoder
+            arch_name="BevFusionEncoder",  #ConcatBEV, BevFusionEncoder
             net_kwargs=dict(
                  features=512, 
             )
@@ -330,7 +329,8 @@ class Exp(BaseExp):
             map_conf=self.exp_config.map_conf,
             point_conf = self.exp_config.pivot_conf,
             transforms=transform,
-            data_split="test",
+            data_split="val_sub",
+            # data_split="test",
         )
 
         if is_distributed():
@@ -349,6 +349,7 @@ class Exp(BaseExp):
         )
 
         self.test_dataset_size = len(test_set)
+        print(f"✓ Test dataset size: {self.test_dataset_size}")
         return test_loader
 
     def _configure_optimizer(self):
@@ -378,60 +379,241 @@ class Exp(BaseExp):
         outputs = self.model(batch)
         return self.model.module.post_processor(outputs["outputs"], batch["targets"])
 
-    def test_step(self, batch,step, ap_matrix, ap_count_matrix):
+def save_results(self, tokens, results, dt_masks, batch=None):
+        """
+        Save predictions to disk as .npz files
+        
+        Args:
+            tokens: List of sample identifiers
+            results: List of prediction results dicts
+            dt_masks: List of predicted instance masks
+            batch: Optional batch dict with extra scene information
+        """
+        
+        # Create results directory on first call
+        if self.evaluation_save_dir is None:
+            # self.output_dir is set by BaseExp (e.g., outputs/pivotnet_nuscenes_swint/...)
+            self.evaluation_save_dir = os.path.join(
+                self.output_dir, 
+                "evaluation", 
+                "results"
+            )
+            os.makedirs(self.evaluation_save_dir, exist_ok=True)
+            print(f"\n✓ Results will be saved to: {self.evaluation_save_dir}\n")
+        
+        # Save each sample as individual .npz file
+        targets = batch['targets'] if batch is not None else None
+        nusc_token = batch['extra_infos']['token'] if batch is not None else None
+        ego_pose = batch['extra_infos']['ego_pose'] if batch is not None else None
+        scene = batch['extra_infos']['scene'] if batch is not None else None
+        frame_idx = batch['extra_infos']['frame_index'] if batch is not None else None
+
+        for token, dt_res, dt_mask, target in zip(tokens, results, dt_masks, targets):
+            save_path = os.path.join(self.evaluation_save_dir, f"{token}.npz")
+            np.savez_compressed(
+                save_path, 
+                nusc_token=nusc_token,  # NuScenes token
+                scene=scene,            # Scene name
+                frame_idx=frame_idx,     # Frame index within scene
+                ego_pose=ego_pose,      # Ego vehicle pose
+                targets=targets,       # Ground truth targets (if available)
+                dt_res=dt_res,        # Additional results (scores, lines, etc.)
+                dt_mask=dt_mask,      # Instance mask predictions
+            )
+        # print(f"✓ Saved {len(tokens)} sample(s) to evaluation/results/")
+
+    def save_visualizations(self, tokens, results, dt_masks, gt_masks=None, batch=None):
+        """
+        Save BEV visualizations of predictions and ground truth
+        
+        Args:
+            tokens: List of sample identifiers
+            results: List of prediction results dicts (contains pivot points/polylines)
+            dt_masks: List of predicted instance masks (C, H, W)
+            gt_masks: Optional ground truth masks (B, C, H, W) or (C, H, W)
+            batch: Optional batch dict (contains ground truth polylines)
+        """
+        import cv2
+        
+        # Create visualization directory on first call
+        vis_dir = os.path.join(
+            os.path.dirname(self.evaluation_save_dir),
+            "visualization"
+        )
+        os.makedirs(vis_dir, exist_ok=True)
+        
+        # Get map configuration
+        map_size = self.exp_config.map_conf["map_size"]  # (H, W)
+        map_resolution = self.exp_config.map_conf["map_resolution"]
+        
+        # Color palette: class-specific colors
+        class_colors = {
+            0: (0, 0, 1),      # Blue for dividers
+            1: (1, 0, 0),      # Red for pedestrians
+            2: (0, 1, 0),      # Green for boundaries
+        }
+        
+        # Visualize each sample
+        for idx, token in enumerate(tokens):
+            self._visualize_polylines(
+                token, results[idx], batch, vis_dir, 
+                map_size, map_resolution, class_colors)
+
+    def _visualize_polylines(self, token, result, batch, vis_dir, map_size, map_resolution, class_colors, separate_plots=False):
+        """
+        Visualize predicted and ground truth polylines on BEV map
+        
+        Args:
+            token: Sample identifier
+            result: Prediction result dict with pivot points
+            batch: Batch dict with ground truth polylines
+            vis_dir: Directory to save visualization
+            map_size: (H, W) of BEV map
+            map_resolution: Resolution in meters per pixel
+            class_colors: Dict mapping class_id to RGB colors
+        """
+        import cv2
+        def _to_numpy(t):
+            if isinstance(t, torch.Tensor):
+                return t.detach().cpu().numpy()
+            return np.asarray(t)
+
+        # Draw ground truth polylines in dark colors
+        points_dict = batch['targets']['points']
+        vlen_dict   = batch['targets']['valid_len']
+
+        # Map extents (for limits)
+        map_size = batch['extra_infos']['map_size']
+        L = float(_to_numpy(map_size[0]).reshape(-1)[0])
+        Wm = float(_to_numpy(map_size[1]).reshape(-1)[0])
+
+        fig, ax = plt.subplots(figsize=(16, 4), dpi=120)
+
+        for cls in sorted(points_dict.keys()):
+            pts = _to_numpy(points_dict[cls][0])        # (num_lines, max_pts, 2)
+            vlen = _to_numpy(vlen_dict[cls][0]).astype(int)         # (num_lines,)
+            
+            base_color = class_colors.get(cls, (128, 128, 128))
+            gt_color = tuple(int(c * 0.5) for c in base_color)  # Darken for GT
+            
+            for i in range(len(pts)):
+                n = int(vlen[i])
+                if n <= 0: 
+                    continue
+                xy = pts[i, :n, :]        # (n, 2)
+
+                # polyline
+                ax.plot(xy[:, 0]*L, xy[:, 1]*Wm, color=gt_color, linewidth=2, alpha=0.9)
+
+                # point markers at vertices
+                ax.scatter(xy[:, 0]*L, xy[:, 1]*Wm,
+                        s=12, c=gt_color, edgecolors='black',
+                        linewidths=0.8, alpha=0.9, zorder=3)
+        
+        # Ego vehicle marker at center
+        ax.scatter([L//2], [Wm//2], s=120, c='black', edgecolors='black', zorder=5)
+        ax.grid(True, alpha=0.3)
+        
+        vis_path = os.path.join(vis_dir, f"{token}_gt.png")
+        fig.savefig(vis_path, dpi=150, bbox_inches='tight')
+        # plt.close(fig)
+        # fig, ax = plt.subplots(figsize=(16, 4), dpi=120)
+
+        # Draw predicted polylines in bright colors on top
+        for i in range(len(result["map"])):
+            
+            points = result["map"][i]           # (n_pts, 2)
+            class_id = result["pred_label"][i]
+            
+            base_color = class_colors.get(class_id-1, (128, 128, 128))
+            if points is not None and len(points) >= 2:
+                # Plot line
+                ax.plot(points[:, 0]*map_resolution, points[:, 1]*map_resolution, 
+                        color=base_color, linewidth=2, alpha=0.7)
+                
+                # Plot points as markers
+                ax.scatter(points[:, 0]*map_resolution, points[:, 1]*map_resolution, 
+                        color=base_color, s=12, edgecolors='black', 
+                        linewidths=0.5, alpha=0.7, zorder=3)
+        
+        # Ego vehicle marker at center
+        # ax.scatter([L//2], [Wm//2], s=120, c='black', edgecolors='black', zorder=5)
+        # ax.grid(True, alpha=0.3)
+        
+        # Save visualization
+        vis_path = os.path.join(vis_dir, f"{token}_predictions.png")
+        fig.savefig(vis_path, dpi=150, bbox_inches='tight')
+        plt.close(fig)
+        
+    def test_step(self, batch, step, ap_matrix, ap_count_matrix):
+        """
+        Evaluation step - compute AP metrics AND save predictions
+        
+        Args:
+            batch: Input batch dictionary
+            step: Current sample index
+            ap_matrix: Array to accumulate AP scores
+            ap_count_matrix: Array to track count
+        
+        Returns:
+            Updated ap_matrix and ap_count_matrix
+        """
+        
         with torch.no_grad():
+            # Prepare batch
             batch["images"] = batch["images"].float().cuda()
             batch["lidars"] = batch["lidars"].float().cuda()
             batch["lidar_mask"] = batch["lidar_mask"].float().cuda()
-            
-            start_time = time.time()
-            
+
+            # Forward pass
             outputs = self.model(batch)
             results, dt_masks = self.model.module.post_processor(outputs["outputs"])
             
-            '''end_time = time.time()
-            fps = 1/(end_time-start_time)
-            print(f"Inference Speed: {fps:.2f} FPS")'''
-    
-            map_resolution=(0.15, 0.15)
+            # Extract sample tokens/identifiers
+            tokens = batch.get('token', [f"sample_{step}_{i}" for i in range(len(dt_masks))])
+            
+            # ===== SAVE RESULTS and VISUALIZATIONS =====
+            self.save_results(tokens, results, dt_masks, batch=batch)
+            self.save_visualizations(
+                tokens, results, dt_masks, 
+                batch.get('targets', {}).get('masks', None),
+                batch=batch)
+            # ================================
+            
+            # Compute AP metrics
+            map_resolution = (0.15, 0.15)
             SAMPLED_RECALLS = torch.linspace(0.1, 1, 10).cuda()
-            map_resolution = map_resolution
-            max_line_count =100
+            max_line_count = 100
             THRESHOLDS = [0.2, 0.5, 1.0, 1.5]
+            
             dt_masks = np.asarray(dt_masks)
             dt_scores = results[0]["confidence_level"]
-            dt_scores = np.array(list(dt_scores) + [-1] * (max_line_count - len(dt_scores)))  
-            #print(len(results[0]['map']), results[0]['map'] )
+            dt_scores = np.array(
+                list(dt_scores) + [-1] * (max_line_count - len(dt_scores))
+            )
             
-            # print(torch.from_numpy(dt_masks).size(), batch['targets']['masks'].size(), torch.from_numpy(np.array(dt_scores)).size())
+            # Update AP matrices
             ap_matrix, ap_count_matrix = get_batch_ap(
                 ap_matrix.cuda(),
                 ap_count_matrix.cuda(),
-                torch.from_numpy(dt_masks).cuda(),#ic| torch.from_numpy(dt_masks[0]).size(): torch.Size([3, 400, 200]),ic| indices: tensor([0, 1, 2, 3], dtype=torch.uint8)
+                torch.from_numpy(dt_masks).cuda(),
                 batch['targets']['masks'].cuda(),
                 *map_resolution,
                 torch.from_numpy(np.array(dt_scores)).unsqueeze(0).cuda(),
                 THRESHOLDS,
-                SAMPLED_RECALLS,)
+                SAMPLED_RECALLS,
+            )
             
-            #if(step%   50==0):
-            #    print(ap_matrix/ ap_count_matrix)
-            #visual_map_pred(self.exp_config.map_conf['map_region'], results[0], step, self.exp_config.DATA_ROOT)
+            # Save accumulated AP matrices to disk
+            metrics_dir = os.path.dirname(self.evaluation_save_dir)
+            metrics_path = os.path.join(metrics_dir, "metrics.npz")
+            np.savez_compressed(
+                metrics_path,
+                ap_matrix=ap_matrix.cpu().numpy(),
+                ap_count_matrix=ap_count_matrix.cpu().numpy()
+            )
 
         return ap_matrix, ap_count_matrix
-
-    def save_results(self, tokens, results, dt_masks):
-        if self.evaluation_save_dir is None:
-            self.evaluation_save_dir = os.path.join(self.output_dir, "evaluation", "results")
-            if not os.path.exists(self.evaluation_save_dir):
-                os.makedirs(self.evaluation_save_dir, exist_ok=True)
-        for (token, dt_res, dt_mask) in zip(tokens, results, dt_masks):
-            save_path = os.path.join(self.evaluation_save_dir, f"{token}.npz")
-            np.savez_compressed(save_path, dt_mask=dt_mask, dt_res=dt_res)
-
-
-
-
 
 if __name__ == "__main__":
     MapMasterCli(Exp).run()

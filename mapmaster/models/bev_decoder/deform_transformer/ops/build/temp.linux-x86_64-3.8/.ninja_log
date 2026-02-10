@@ -1,0 +1,9 @@
+# ninja log v5
+1	11602	1730193369329748915	/zrq/PivotNet/mapmaster/models/bev_decoder/deform_transformer/ops/build/temp.linux-x86_64-3.8/zrq/PivotNet/mapmaster/models/bev_decoder/deform_transformer/ops/src/cpu/ms_deform_attn_cpu.o	9d1bcaddaa9d66c5
+1	34706	1730193392410597962	/zrq/PivotNet/mapmaster/models/bev_decoder/deform_transformer/ops/build/temp.linux-x86_64-3.8/zrq/PivotNet/mapmaster/models/bev_decoder/deform_transformer/ops/src/vision.o	eea87c24a3d892b6
+1	77196	1730193434867320415	/zrq/PivotNet/mapmaster/models/bev_decoder/deform_transformer/ops/build/temp.linux-x86_64-3.8/zrq/PivotNet/mapmaster/models/bev_decoder/deform_transformer/ops/src/cuda/ms_deform_attn_cuda.o	83f4586fc0e3152a
+0	4052	1770192418075504999	/workspace/SuperMapNet/mapmaster/models/bev_decoder/deform_transformer/ops/build/temp.linux-x86_64-3.8/workspace/SuperMapNet/mapmaster/models/bev_decoder/deform_transformer/ops/src/cpu/ms_deform_attn_cpu.o	30ecfab26c00d664
+0	20078	1770192434087804015	/workspace/SuperMapNet/mapmaster/models/bev_decoder/deform_transformer/ops/build/temp.linux-x86_64-3.8/workspace/SuperMapNet/mapmaster/models/bev_decoder/deform_transformer/ops/src/vision.o	d1da95a21eafc457
+0	28699	1770192442711965063	/workspace/SuperMapNet/mapmaster/models/bev_decoder/deform_transformer/ops/build/temp.linux-x86_64-3.8/workspace/SuperMapNet/mapmaster/models/bev_decoder/deform_transformer/ops/src/cuda/ms_deform_attn_cuda.o	c266130bff73ce6f
+3	4145	1770199400281824127	/workspace/SuperMapNet/mapmaster/models/bev_decoder/deform_transformer/ops/build/temp.linux-x86_64-3.8/workspace/SuperMapNet/mapmaster/models/bev_decoder/deform_transformer/ops/src/cpu/ms_deform_attn_cpu.o	30ecfab26c00d664
+4	19996	1770199416122119857	/workspace/SuperMapNet/mapmaster/models/bev_decoder/deform_transformer/ops/build/temp.linux-x86_64-3.8/workspace/SuperMapNet/mapmaster/models/bev_decoder/deform_transformer/ops/src/vision.o	d1da95a21eafc457

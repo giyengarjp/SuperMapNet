@@ -1,0 +1,53 @@
+"""
+docker run -itd --gpus all -p 6006:6006 -v ~/supermapnet/SuperMapNet/:/workspace/SuperMapNet -v /media/wolfrush/data/nuscenes/:/workspace/nuscenes/ gopalan/supermapnet
+docker exec -it admiring_kirch /bin/bash
+docker exec -it charming_pasteur /bin/bash
+
+CUDA_VISIBLE_DEVICES=0 bash run.sh test pivotnet_nuscenes_swint outputs/pivotnet_nuscenes_swint/nuscenes_full_e30_b1_g8-2025-11-19T06\:05\:26/dump_model/checkpoint_epoch_17.pth
+CUDA_VISIBLE_DEVICES=0 bash run.sh test pivotnet_nuscenes_swint outputs/pivotnet_nuscenes_swint/latest/dump_model/checkpoint_epoch_29.pth
+CUDA_VISIBLE_DEVICES=0 bash run.sh test pivotnet_nuscenes_swint_dense outputs/pivotnet_nuscenes_swint_dense/latest/dump_model/checkpoint_epoch_29.pth
+CUDA_VISIBLE_DEVICES=0 bash run.sh test pivotnet_nuscenes_swint_with_viz outputs/pivotnet_nuscenes_swint/latest/dump_model/checkpoint_epoch_29.pth
+
+mapmaster.engine.core.py changed line 55 to include experiment name argument
+and "def _get_exp_output_dir(self)" on line 65
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 bash run.sh train pivotnet_nuscenes_swint 30
+
+ls -1 | wc -l
+find . -type f | wc -l
+
+python3 -m tools.anno_converter.nuscenes.convert -d /workspace/SuperMapNet/data/nuscenes/ -v v1.0-mini
+python3 -m tools.anno_converter.nuscenes.convert -d /workspace/nuscenes/ -v v1.0-trainval
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 bash run.sh train pivotnet_nuscenes_swint 30
+Works for 4 GPUs since snc_bn is set to 4 in run.sh
+
+SAM2 Related Issue - commented line 8 in mapmaster/models/backbone/model.py
+
+Cannot find MultiScaleDeformableAttention - export PYTHONPATH=$PYTHONPATH:/usr/lib/python3.8/site-packages/MultiScaleDeformableAttention-1.0-py3.8-linux-x86_64.egg
+fixed first few lines in run.sh
+
+Cannot find some .so library - 
+    1. find /usr -name 'libc10.so' 2>/dev/null
+    2. export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/python3.8/dist-packages/torch/lib
+
+LibGL.so.1 Issue
+    1. apt-get update && apt-get install -y libgl1-mesa-glx
+    2. apt-get install -y libglib2.0-0
+
+CUDA:
+apt-get update && apt-get install -y libxml2
+apt-get install -y libglib2.0-0 libxext6 libx11-6 libxi6 libxrender1 libxrandr2
+wget https://developer.download.nvidia.com/compute/cuda/11.1.0/local_installers/cuda_11.1.0_455.23.05_linux.run
+sh cuda_11.1.0_455.23.05_linux.run
+
+CUDA Ops:
+cd mapmaster/models/bev_decoder/deform_transformer/ops
+bash make.sh
+
+pip3 install -r requirement.txt
+
+AttributeError: module 'PIL.Image' has no attribute 'LINEAR'
+pip install pillow==9.5.0
+
+Changed line 29 in pivotnet_nuscenese_sqint.py for nuscenes-mini
+Changed line 203 in nuscenes_pivotnet.py to remove av3 in mapmaster/datasets
+"""
