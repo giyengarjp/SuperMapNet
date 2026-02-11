@@ -1,5 +1,5 @@
 import torch.nn as nn
-from mapmaster.models import backbone, bev_decoder, ins_decoder, output_head, temporal, lidar_encoder,fusionbev_encoder, cross_encoder
+from mapmaster.models import backbone, bev_decoder, ins_decoder, output_head, lidar_encoder,fusionbev_encoder, cross_encoder
 import os
 
 

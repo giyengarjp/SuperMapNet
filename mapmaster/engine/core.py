@@ -52,10 +52,7 @@ class BaseCli:
         parser.add_argument("-te", "--train_and_eval", dest="train_and_eval", action="store_true", help="train+eval")
         parser.add_argument("--find_unused_parameters", dest="find_unused_parameters", action="store_true")
         parser.add_argument("-d", "--devices", default="0", type=str, help="device for training")
-<<<<<<< HEAD
-=======
         parser.add_argument("--experiment_name", type=str, default=None, help="name of experiment folder")
->>>>>>> current
         parser.add_argument("--ckpt", type=str, default=None, help="checkpoint to start from or be evaluated")
         parser.add_argument("--pretrained_model", type=str, default=None, help="pretrained_model used by training")
         parser.add_argument("--sync_bn", type=int, default=0, help="0-> disable sync_bn, 1-> whole world")

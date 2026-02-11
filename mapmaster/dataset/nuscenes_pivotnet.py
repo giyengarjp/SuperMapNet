@@ -274,11 +274,7 @@ if __name__ == "__main__":
         version = 'v1.0-trainval',
         # version = 'v1.0-mini',
         dataset_name="nuscenes",
-<<<<<<< HEAD
-        nusc_root='/workspace/nuscenes/',
-=======
         nusc_root='/workspace/SuperMapNet/data/nuscenes/',
->>>>>>> current
         split_dir="assets/splits/nuscenes",
         num_classes=3,
         ego_size=(120, 30),

@@ -115,8 +115,6 @@ class EXPConfig:
         fusion_encoder=dict(
             # arch_name="ConcatBEV",  #ConcatBEV, BevFusionEncoder
             arch_name="BevFusionEncoder",  #ConcatBEV, BevFusionEncoder
-            # arch_name="ConcatBEV",  #ConcatBEV, BevFusionEncoder
-            arch_name="BevFusionEncoder",  #ConcatBEV, BevFusionEncoder
             net_kwargs=dict(
                  features=512, 
             )
@@ -334,8 +332,6 @@ class Exp(BaseExp):
             map_conf=self.exp_config.map_conf,
             point_conf = self.exp_config.pivot_conf,
             transforms=transform,
-            data_split="val_sub",
-            # data_split="test",
             data_split="val_sub",
             # data_split="test",
         )
@@ -632,8 +628,6 @@ class Exp(BaseExp):
                 *map_resolution,
                 torch.from_numpy(np.array(dt_scores)).unsqueeze(0).cuda(),
                 THRESHOLDS,
-                SAMPLED_RECALLS,
-            )
                 SAMPLED_RECALLS,
             )
             
