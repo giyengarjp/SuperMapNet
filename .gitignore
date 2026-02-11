@@ -1,12 +1,13 @@
 data/*
 assets/weights/*
-evaluation/*
+evaluation/
 mapmaster/models_backup/*
 
 # Python
 __pycache__/
 */__pycache__/*
 *.py[cod]
+*.pyc
 
 # build artifacts
 mapmaster/models/bev_decoder/deform_transformer/ops/build/
