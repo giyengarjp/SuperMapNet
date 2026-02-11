@@ -387,7 +387,7 @@ class Exp(BaseExp):
         outputs = self.model(batch)
         return self.model.module.post_processor(outputs["outputs"], batch["targets"])
 
-def save_results(self, tokens, results, dt_masks, batch=None):
+    def save_results(self, tokens, results, dt_masks, batch=None):
         """
         Save predictions to disk as .npz files
         
