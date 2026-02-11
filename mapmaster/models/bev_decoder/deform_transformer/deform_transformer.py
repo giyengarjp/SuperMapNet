@@ -661,7 +661,7 @@ class DeformTransformerDecoder(nn.Module):
         if self.return_intermediate:
             return torch.stack(intermediate)
 
-        return output
+        return output.unsqueeze(0)
 
 
 def _get_clones(module, N):

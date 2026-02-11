@@ -134,7 +134,7 @@ class LidarPred(nn.Module):
         return fused_feature_img,  fused_feature
 
     def forward(self, x, img_feature=None):
-
+        
         '''x11 = F.relu(self.bn11(self.conv11(x)))
         x1p, id1 = self.max_pool(x11)
 

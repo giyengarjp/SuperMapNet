@@ -274,7 +274,7 @@ if __name__ == "__main__":
         version = 'v1.0-trainval',
         # version = 'v1.0-mini',
         dataset_name="nuscenes",
-        nusc_root='/workspace/SuperMapNet/data/nuscenes/',
+        nusc_root='/workspace/nuscenes/',
         split_dir="assets/splits/nuscenes",
         num_classes=3,
         ego_size=(120, 30),
@@ -326,6 +326,15 @@ if __name__ == "__main__":
     test_dataset_size = len(test_set)
     print(f"✓ Test dataset size: {test_dataset_size}")
     for i, data in enumerate(test_loader):
-        out_path = f"/workspace/SuperMapNet/evaluation/viz_test_set/{i}"
+        
+    # if i%10==0:
+        out_path = f"/workspace/SuperMapNet/viz_outputs/{i}"
+        points_dict = data["targets"]["points"]
+        vlen_dict   = data["targets"]["valid_len"]
+        points_np = {k: v[0].cpu().numpy() for k, v in points_dict.items()}
+        vlen_np   = {k: v[0].cpu().numpy() for k, v in vlen_dict.items()}
+        # out_path_file = f"/workspace/SuperMapNet/viz_outputs/{i}/polyline.npz"
+        # np.savez(out_path_file, points=points_np, valid_len=vlen_np)
         print(f"{data['extra_infos']['scene']['name']}: {data['extra_infos']['frame_index']}")
-        visualize_sample(data, out_dir=out_path)
+        print()
+        # visualize_sample(data, out_dir=out_path)

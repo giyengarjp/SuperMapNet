@@ -1,15 +1,6 @@
 #!/usr/bin/env bash
-# docker run -itd --gpus all -p 6006:6006 -v /home/gopalan_iyengar/SuperMapNet/:/workspace/SuperMapNet -v /media/wolfrush/data/samba-rd-data/:/workspace/SuperMapNet/data/ gopalan/supermapnet
-
 # CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 bash run.sh train-continue pivotnet_nuscenes_swint_dense 30 1 8 /workspace/SuperMapNet/outputs/pivotnet_nuscenes_swint_dense/pivotnet_nuscenes_swint_dense_e30_b1_g8-2026-01-23T04:58:43/dump_model/checkpoint_epoch_14.pth
 # CUDA_VISIBLE_DEVICES=0 bash run.sh test pivotnet_nuscenes_swint_dense outputs/pivotnet_nuscenes_swint_dense/latest/dump_model/checkpoint_epoch_29.pth
-# CUDA_VISIBLE_DEVICES=0 bash run.sh test pivotnet_nuscenes_swint_dense weights/60_30_ckpt_29.pth
-# CUDA_VISIBLE_DEVICES=1 bash run.sh test pivotnet_nuscenes_swint weights/120_30_ckpt_29.pth
-
-# tmux new -s data_gen_bezier
-# tmus ls 
-# ctrl+b d
-# tmux attach -t data_gen_bezier
 
 #export PYTHONPATH=$(pwd)
 export PYTHONPATH=$(pwd):$PYTHONPATH:/usr/lib/python3.8/site-packages

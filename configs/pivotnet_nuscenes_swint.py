@@ -30,7 +30,7 @@ class EXPConfig:
         # version = 'v1.0-mini',
         # version = 'v1.0-mini',
         dataset_name="nuscenes",
-        nusc_root='/workspace/SuperMapNet/data/nuscenes/',
+        nusc_root='/workspace/nuscenes/',
         split_dir="assets/splits/nuscenes",
         num_classes=3,
         ego_size=(120, 30),
@@ -387,7 +387,7 @@ class Exp(BaseExp):
         outputs = self.model(batch)
         return self.model.module.post_processor(outputs["outputs"], batch["targets"])
 
-    def save_results(self, tokens, results, dt_masks, batch=None):
+def save_results(self, tokens, results, dt_masks, batch=None):
         """
         Save predictions to disk as .npz files
         
@@ -495,7 +495,7 @@ class Exp(BaseExp):
         L = float(_to_numpy(map_size[0]).reshape(-1)[0])
         Wm = float(_to_numpy(map_size[1]).reshape(-1)[0])
 
-        fig, ax = plt.subplots(figsize=(16, int(16*Wm/L)), dpi=120)
+        fig, ax = plt.subplots(figsize=(16, 4), dpi=120)
 
         for cls in sorted(points_dict.keys()):
             pts = _to_numpy(points_dict[cls][0])        # (num_lines, max_pts, 2)

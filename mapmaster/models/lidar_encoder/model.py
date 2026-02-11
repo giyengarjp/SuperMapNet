@@ -15,7 +15,7 @@ class LiDARPointPillarEncoder(nn.Module):
         lidar_data = inputs["lidars"]
         lidar_mask = inputs["lidar_mask"]
         neck_feature = self.pp(lidar_data, lidar_mask)
-       # ic(neck_feature.size())
+        #ic(neck_feature.size())
         
         return {
             "lidar_enc_features": list(neck_feature),

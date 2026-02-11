@@ -1,10 +1,7 @@
 data/*
 assets/weights/*
-<<<<<<< HEAD
-weights/*
-=======
 evaluation/*
-**/__pycache__/*
+
 # Python
 __pycache__/
 *.py[cod]
@@ -13,4 +10,4 @@ __pycache__/
 mapmaster/models/bev_decoder/deform_transformer/ops/build/
 *.egg
 *.so
->>>>>>> current
+
