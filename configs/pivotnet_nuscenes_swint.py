@@ -18,6 +18,8 @@ from tools.evaluation.ap import instance_mask_ap as get_batch_ap
 from mapmaster.dataset.visual import visual_map_pred
 import matplotlib.pyplot as plt
 
+import matplotlib.pyplot as plt
+
 class EXPConfig:
     
     DATA_ROOT = './data/nuscenes/'
@@ -26,8 +28,9 @@ class EXPConfig:
     map_conf = dict(
         version = 'v1.0-trainval',
         # version = 'v1.0-mini',
+        # version = 'v1.0-mini',
         dataset_name="nuscenes",
-        nusc_root='/workspace/nuscenes/',
+        nusc_root='/workspace/SuperMapNet/data/nuscenes/',
         split_dir="assets/splits/nuscenes",
         num_classes=3,
         ego_size=(120, 30),
@@ -110,6 +113,8 @@ class EXPConfig:
             )
         ),
         fusion_encoder=dict(
+            # arch_name="ConcatBEV",  #ConcatBEV, BevFusionEncoder
+            arch_name="BevFusionEncoder",  #ConcatBEV, BevFusionEncoder
             # arch_name="ConcatBEV",  #ConcatBEV, BevFusionEncoder
             arch_name="BevFusionEncoder",  #ConcatBEV, BevFusionEncoder
             net_kwargs=dict(
@@ -331,6 +336,8 @@ class Exp(BaseExp):
             transforms=transform,
             data_split="val_sub",
             # data_split="test",
+            data_split="val_sub",
+            # data_split="test",
         )
 
         if is_distributed():
@@ -349,6 +356,7 @@ class Exp(BaseExp):
         )
 
         self.test_dataset_size = len(test_set)
+        print(f"✓ Test dataset size: {self.test_dataset_size}")
         print(f"✓ Test dataset size: {self.test_dataset_size}")
         return test_loader
 
@@ -379,7 +387,7 @@ class Exp(BaseExp):
         outputs = self.model(batch)
         return self.model.module.post_processor(outputs["outputs"], batch["targets"])
 
-def save_results(self, tokens, results, dt_masks, batch=None):
+    def save_results(self, tokens, results, dt_masks, batch=None):
         """
         Save predictions to disk as .npz files
         
@@ -487,7 +495,7 @@ def save_results(self, tokens, results, dt_masks, batch=None):
         L = float(_to_numpy(map_size[0]).reshape(-1)[0])
         Wm = float(_to_numpy(map_size[1]).reshape(-1)[0])
 
-        fig, ax = plt.subplots(figsize=(16, 4), dpi=120)
+        fig, ax = plt.subplots(figsize=(16, int(16*Wm/L)), dpi=120)
 
         for cls in sorted(points_dict.keys()):
             pts = _to_numpy(points_dict[cls][0])        # (num_lines, max_pts, 2)
@@ -561,9 +569,12 @@ def save_results(self, tokens, results, dt_masks, batch=None):
         
         with torch.no_grad():
             # Prepare batch
+            # Prepare batch
             batch["images"] = batch["images"].float().cuda()
             batch["lidars"] = batch["lidars"].float().cuda()
             batch["lidar_mask"] = batch["lidar_mask"].float().cuda()
+
+            # Forward pass
 
             # Forward pass
             outputs = self.model(batch)
@@ -582,20 +593,40 @@ def save_results(self, tokens, results, dt_masks, batch=None):
             
             # Compute AP metrics
             map_resolution = (0.15, 0.15)
+            # Extract sample tokens/identifiers
+            tokens = batch.get('token', [f"sample_{step}_{i}" for i in range(len(dt_masks))])
+            
+            # ===== SAVE RESULTS and VISUALIZATIONS =====
+            self.save_results(tokens, results, dt_masks, batch=batch)
+            self.save_visualizations(
+                tokens, results, dt_masks, 
+                batch.get('targets', {}).get('masks', None),
+                batch=batch)
+            # ================================
+            
+            # Compute AP metrics
+            map_resolution = (0.15, 0.15)
             SAMPLED_RECALLS = torch.linspace(0.1, 1, 10).cuda()
             max_line_count = 100
+            max_line_count = 100
             THRESHOLDS = [0.2, 0.5, 1.0, 1.5]
+            
             
             dt_masks = np.asarray(dt_masks)
             dt_scores = results[0]["confidence_level"]
             dt_scores = np.array(
                 list(dt_scores) + [-1] * (max_line_count - len(dt_scores))
             )
+            dt_scores = np.array(
+                list(dt_scores) + [-1] * (max_line_count - len(dt_scores))
+            )
             
+            # Update AP matrices
             # Update AP matrices
             ap_matrix, ap_count_matrix = get_batch_ap(
                 ap_matrix.cuda(),
                 ap_count_matrix.cuda(),
+                torch.from_numpy(dt_masks).cuda(),
                 torch.from_numpy(dt_masks).cuda(),
                 batch['targets']['masks'].cuda(),
                 *map_resolution,
@@ -603,7 +634,17 @@ def save_results(self, tokens, results, dt_masks, batch=None):
                 THRESHOLDS,
                 SAMPLED_RECALLS,
             )
+                SAMPLED_RECALLS,
+            )
             
+            # Save accumulated AP matrices to disk
+            metrics_dir = os.path.dirname(self.evaluation_save_dir)
+            metrics_path = os.path.join(metrics_dir, "metrics.npz")
+            np.savez_compressed(
+                metrics_path,
+                ap_matrix=ap_matrix.cpu().numpy(),
+                ap_count_matrix=ap_count_matrix.cpu().numpy()
+            )
             # Save accumulated AP matrices to disk
             metrics_dir = os.path.dirname(self.evaluation_save_dir)
             metrics_path = os.path.join(metrics_dir, "metrics.npz")

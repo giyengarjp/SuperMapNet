@@ -5,7 +5,7 @@ from mapmaster.models.backbone.resnet import ResNet
 from mapmaster.models.backbone.efficientnet import EfficientNet
 from mapmaster.models.backbone.swin_transformer import SwinTransformer
 from mapmaster.models.backbone.bifpn import BiFPN
-from mapmaster.models.backbone.sam2feature import SAM2Feature
+# from mapmaster.models.backbone.sam2feature import SAM2Feature
 from mmcv.cnn import build_conv_layer
 import numpy as np
 

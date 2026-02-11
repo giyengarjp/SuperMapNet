@@ -224,7 +224,7 @@ class TransformerDecoder(nn.Module):
         if self.return_intermediate:
             return torch.stack(intermediate)
 
-        return output.unsqueeze(0)
+        return output
 
 
 class TransformerEncoderLayer(nn.Module):

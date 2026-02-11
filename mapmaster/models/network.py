@@ -13,9 +13,9 @@ class MapMaster(nn.Module):
         self.im_backbone = self.create_backbone(**model_config["im_backbone"])
         self.bev_decoder = self.create_bev_decoder(**model_config["bev_decoder"])
        
-        #self.lidar_encoder = self.create_lidar_encoder(**model_config["lidar_encoder"])
-        #self.cross_encoder = self.create_cross_encoder(**model_config["cross_encoder"])
-        #self.fusion_encoder = self.create_fusion_encoder(**model_config["fusion_encoder"])
+        self.lidar_encoder = self.create_lidar_encoder(**model_config["lidar_encoder"])
+        self.cross_encoder = self.create_cross_encoder(**model_config["cross_encoder"])
+        self.fusion_encoder = self.create_fusion_encoder(**model_config["fusion_encoder"])
             
         self.ins_decoder = self.create_ins_decoder(**model_config["ins_decoder"])
         self.output_head = self.create_output_head(**model_config["output_head"])
@@ -31,9 +31,9 @@ class MapMaster(nn.Module):
             outputs.update({"ida_mats": inputs["ida_mats"].float()})
         outputs.update(self.im_backbone(outputs))
         outputs.update(self.bev_decoder(outputs))
-        #outputs.update(self.lidar_encoder(outputs))
-        #outputs.update(self.cross_encoder(outputs))
-        #outputs.update(self.fusion_encoder(outputs))
+        outputs.update(self.lidar_encoder(outputs))
+        outputs.update(self.cross_encoder(outputs))
+        outputs.update(self.fusion_encoder(outputs))
         outputs.update(self.ins_decoder(outputs))
         outputs.update(self.output_head(outputs))
         return outputs

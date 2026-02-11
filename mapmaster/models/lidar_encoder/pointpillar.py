@@ -217,5 +217,4 @@ class PointPillarEncoder(nn.Module):
             [voxel_feature1, voxel_feature2, voxel_feature3], dim=1)#voxel_feature.shape: torch.Size([2, 448, 600, 200])
         # ic(voxel_feature.shape,self.conv_out(voxel_feature).transpose(3, 2).shape)#ic| voxel_feature.shape: torch.Size([1, 448, 600, 200]), self.conv_out(voxel_feature).transpose(3, 2).shape: torch.Size([1, 128, 200, 600])
         # exit(0) '''
-        #print(neck_feature.size())
-        return   neck_feature # self.conv_out(voxel_feature), 
+        return neck_feature # self.conv_out(voxel_feature), 

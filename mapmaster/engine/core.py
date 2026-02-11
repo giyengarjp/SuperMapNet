@@ -52,6 +52,7 @@ class BaseCli:
         parser.add_argument("-te", "--train_and_eval", dest="train_and_eval", action="store_true", help="train+eval")
         parser.add_argument("--find_unused_parameters", dest="find_unused_parameters", action="store_true")
         parser.add_argument("-d", "--devices", default="0", type=str, help="device for training")
+        parser.add_argument("--experiment_name", type=str, default=None, help="name of experiment folder")
         parser.add_argument("--ckpt", type=str, default=None, help="checkpoint to start from or be evaluated")
         parser.add_argument("--pretrained_model", type=str, default=None, help="pretrained_model used by training")
         parser.add_argument("--sync_bn", type=int, default=0, help="0-> disable sync_bn, 1-> whole world")
@@ -62,20 +63,54 @@ class BaseCli:
         return parser
 
     def _get_exp_output_dir(self):
-        exp_dir = os.path.join(os.path.join(get_root_dir(), "outputs"), sanitize_filename(self.exp.exp_name))
-        os.makedirs(exp_dir, exist_ok=True)
+        base_exp_dir = os.path.join(
+            os.path.join(get_root_dir(), "outputs"),
+            sanitize_filename(self.exp.exp_name)
+        )
+        os.makedirs(base_exp_dir, exist_ok=True)
         output_dir = None
+
+        # ------------------------------------------------------
+        # If experiment_name is provided → insert it before timestamp
+        # ------------------------------------------------------
+        if self.args.experiment_name is not None and self.args.ckpt is None:
+            if self.env.global_rank() == 0:
+                ts = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+                folder_name = f"{sanitize_filename(self.args.experiment_name)}-{ts}"
+                output_dir = os.path.join(base_exp_dir, folder_name)
+                os.makedirs(output_dir, exist_ok=True)
+
+                # latest symlink logic (same as original)
+                symlink = os.path.join(base_exp_dir, "latest")
+                symlink_tmp = os.path.join(base_exp_dir, "latest_tmp")
+                if os.path.exists(symlink_tmp):
+                    os.remove(symlink_tmp)
+                os.symlink(os.path.relpath(output_dir, base_exp_dir), symlink_tmp)
+                os.rename(symlink_tmp, symlink)
+            output_dir = all_gather_object(output_dir)[0]
+            return output_dir
+
+        # ------------------------------------------------------
+        # Original behavior when:
+        #   - experiment_name is NOT provided
+        #   - OR ckpt is provided (resume)
+        # ------------------------------------------------------
         if self.args.ckpt:
             output_dir = os.path.dirname(os.path.dirname(os.path.abspath(self.args.ckpt)))
         elif self.env.global_rank() == 0:
-            output_dir = os.path.join(exp_dir, datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S"))
+            output_dir = os.path.join(
+                base_exp_dir,
+                datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+            )
             os.makedirs(output_dir, exist_ok=True)
-            # make a symlink "latest"
-            symlink, symlink_tmp = os.path.join(exp_dir, "latest"), os.path.join(exp_dir, "latest_tmp")
+
+            symlink = os.path.join(base_exp_dir, "latest")
+            symlink_tmp = os.path.join(base_exp_dir, "latest_tmp")
             if os.path.exists(symlink_tmp):
                 os.remove(symlink_tmp)
-            os.symlink(os.path.relpath(output_dir, exp_dir), symlink_tmp)
+            os.symlink(os.path.relpath(output_dir, base_exp_dir), symlink_tmp)
             os.rename(symlink_tmp, symlink)
+
         output_dir = all_gather_object(output_dir)[0]
         return output_dir
 
