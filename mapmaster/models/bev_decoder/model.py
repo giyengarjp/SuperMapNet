@@ -58,4 +58,5 @@ class DeformTransformerBEVEncoder(nn.Module):
         
         return {#
             "bev_enc_features": list(bev_feats),#img_enc_features    bev_enc_features
+            "img_enc_features": list(bev_feats),#img_enc_features    bev_enc_features
         }

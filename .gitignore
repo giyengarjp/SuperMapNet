@@ -1,9 +1,11 @@
 data/*
 assets/weights/*
 evaluation/*
+mapmaster/models_backup/*
 
 # Python
 __pycache__/
+*/__pycache__/*
 *.py[cod]
 
 # build artifacts

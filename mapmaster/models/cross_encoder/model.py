@@ -16,6 +16,7 @@ class CrossEncoder(nn.Module):
         img_feat = img_feat.permute(0, 2, 3, 1, 4) 
         #print('3', img_feats.size())
         img_feat = img_feat.reshape(*img_feat.shape[:3],  -1)'''
+        
         img_feat = inputs["img_enc_features"] [-1]#
         lidar_enc_feat = (inputs["lidar_enc_features"][-1]).unsqueeze(0) 
        

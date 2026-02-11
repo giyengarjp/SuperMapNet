@@ -27,7 +27,7 @@ class EXPConfig:
         version = 'v1.0-trainval',
         # version = 'v1.0-mini',
         dataset_name="nuscenes",
-        nusc_root='/workspace/nuscenes/',
+        nusc_root='/workspace/SuperMapNet/data/nuscenes/',
         split_dir="assets/splits/nuscenes",
         num_classes=3,
         ego_size=(60, 30),
@@ -487,7 +487,7 @@ class Exp(BaseExp):
         L = float(_to_numpy(map_size[0]).reshape(-1)[0])
         Wm = float(_to_numpy(map_size[1]).reshape(-1)[0])
 
-        fig, ax = plt.subplots(figsize=(16, 4), dpi=120)
+        fig, ax = plt.subplots(figsize=(16, int(16*Wm/L)), dpi=120)
 
         for cls in sorted(points_dict.keys()):
             pts = _to_numpy(points_dict[cls][0])        # (num_lines, max_pts, 2)
@@ -564,7 +564,6 @@ class Exp(BaseExp):
             batch["images"] = batch["images"].float().cuda()
             batch["lidars"] = batch["lidars"].float().cuda()
             batch["lidar_mask"] = batch["lidar_mask"].float().cuda()
-            
             # Forward pass
             outputs = self.model(batch)
             results, dt_masks = self.model.module.post_processor(outputs["outputs"])

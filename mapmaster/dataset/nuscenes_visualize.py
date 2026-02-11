@@ -28,27 +28,6 @@ intrinsic:
 torch.Size([1, 6, 3, 3])
 """
 
-"""
-# Usage (example):
-# Suppose `item` is what your DataLoader returns (batch size 1):
-# item = {
-#   'images': torch.Tensor[1,6,3,H,W],
-#   'targets': {
-#       'masks': torch.Tensor[1,3,800,200],
-#       'points': {0: Tensor[1,N0,M0,2], 1: Tensor[1,N1,M1,2], 2: Tensor[1,N2,M2,2]},
-#       'valid_len': {0: Tensor[1,N0], 1: Tensor[1,N1], 2: Tensor[1,N2]}
-#   },
-#   'extra_infos': {
-#       'map_size': [tensor([120]), tensor([30])],
-#       'img_norm_cfg': {'mean': tensor([[0.4850, 0.4560, 0.4060]]),
-#                        'std': tensor([[0.2290, 0.2240, 0.2250]]),
-#                        'to_rgb': tensor([True])}
-#   }
-# }
-# paths = visualize_sample(item, out_dir="viz_out")
-# print(paths)
-"""
-
 # viz_supermapnet.py
 import os
 import math
@@ -285,11 +264,12 @@ def natural_sort_key(s):
     """Sort filenames naturally (e.g., 1, 2, 10 instead of 1, 10, 2)"""
     return [int(c) if c.isdigit() else c for c in re.split(r'(\d+)', s)]
 
-def create_gifs(viz_folder, output_dir="gifs"):
+def create_gifs(viz_folder):
     """
     Create GIFs from visualization images.
     Assumes folder structure with gt_* and pred_* prefixed images.
     """
+    output_dir = os.path.join(os.path.dirname(viz_folder), "gifs")
     os.makedirs(output_dir, exist_ok=True)
     
     # Get all PNG files
@@ -356,77 +336,27 @@ def create_gifs(viz_folder, output_dir="gifs"):
             loop=0
         )
         # print(f"✓ Saved: {os.path.join(output_dir, 'comparison.gif')}")
+    print("Done! Check the 'gifs' folder.")
 
-if __name__ == "__main__":
-    
-    # viz_folder = "/workspace/SuperMapNet/outputs/pivotnet_nuscenes_swint_dense/latest/evaluation/visualization/"
-    # gif_folder = "/workspace/SuperMapNet/outputs/pivotnet_nuscenes_swint_dense/latest/evaluation/gifs/"
-    # create_gifs(viz_folder, gif_folder)
-    # print("Done! Check the 'gifs' folder.")
+def stack_vertical_centered(img1: Image.Image, img2: Image.Image) -> Image.Image:
+    '''Stack two images vertically on a canvas whose width is max(w1, w2), centered horizontally'''
+    w1, h1 = img1.size
+    w2, h2 = img2.size
+    W = max(w1, w2)
+    H = h1 + h2
 
-    def load_npz_verbose(path):
-        
-        data = np.load(path, allow_pickle=True)   # allow_pickle=True is REQUIRED for dicts
-        print(f"---- Keys in {path} ----")
-        print(list(data.keys()))
-        print()
+    # Use a transparent canvas if images have alpha; otherwise RGB white background
+    mode = 'RGBA' if ('A' in img1.getbands() or 'A' in img2.getbands()) else 'RGB'
+    bg = (255, 255, 255, 0) if mode == 'RGBA' else (255, 255, 255)
+    canvas = Image.new(mode, (W, H), bg)
 
-        for key in data.keys():
-            print(f"===== {key} =====")
+    x1 = (W - w1) // 2
+    x2 = (W - w2) // 2
+    canvas.paste(img1, (x1, 0))
+    canvas.paste(img2, (x2, h1))
+    return canvas
 
-            obj = data[key]
-
-            # Case 1: object arrays (e.g., list of polylines, dictionaries)
-            if obj.dtype == object:
-                obj = obj.item() if obj.size == 1 else obj
-                print(type(obj))
-                # print(obj)
-                print(obj.keys() if isinstance(obj, dict) else f"len: {len(obj)}")
-                print()
-
-            # Case 2: numpy ndarrays
-            else:
-                print("type:", type(obj))
-                print("shape:", obj.shape)
-                # print(obj)
-                print()
-
-        print("---- Done ----")
-
-    results_dir = Path("/workspace/SuperMapNet/outputs/pivotnet_nuscenes_swint_dense/latest/evaluation/results/")
-    for i in range(100):  # 0..99 inclusive
-        fname = f"sample_{i}_0.npz"
-        result_name = results_dir / fname
-        if not result_name.exists():
-            print(f"Missing: {result_name}")    
-        load_npz_verbose(result_name)
-        break
-
-    """
-    # Base paths
-    dense_dir = Path("/workspace/SuperMapNet/outputs/pivotnet_nuscenes_swint_dense/latest/evaluation/visualization")
-    base_dir  = Path("/workspace/SuperMapNet/outputs/pivotnet_nuscenes_swint/latest/evaluation/visualization")
-    out_dir   = Path("/workspace/SuperMapNet/viz_outputs/compare")
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    def stack_vertical_centered(img1: Image.Image, img2: Image.Image) -> Image.Image:
-        '''Stack two images vertically on a canvas whose width is max(w1, w2), centered horizontally'''
-        w1, h1 = img1.size
-        w2, h2 = img2.size
-        W = max(w1, w2)
-        H = h1 + h2
-
-        # Use a transparent canvas if images have alpha; otherwise RGB white background
-        mode = 'RGBA' if ('A' in img1.getbands() or 'A' in img2.getbands()) else 'RGB'
-        bg = (255, 255, 255, 0) if mode == 'RGBA' else (255, 255, 255)
-        canvas = Image.new(mode, (W, H), bg)
-
-        x1 = (W - w1) // 2
-        x2 = (W - w2) // 2
-        canvas.paste(img1, (x1, 0))
-        canvas.paste(img2, (x2, h1))
-        return canvas
-
+def create_comparison_images(dir1, dir2, out_dir):
     missing = []
     made = 0
 
@@ -454,9 +384,58 @@ if __name__ == "__main__":
         stacked.save(out_path)
         made += 1
 
-    print(f"Created {made} stacked images in: {out_dir}")
+    print(f"Created {made} stacked comparison images in: {out_dir}")
     if missing:
         print("Missing pairs (i, dense_missing, base_missing):")
         for entry in missing:
             print(entry)
-    """
+
+def load_npz_verbose(path):
+    
+    data = np.load(path, allow_pickle=True)   # allow_pickle=True is REQUIRED for dicts
+    print(f"---- Keys in {path} ----")
+    print(list(data.keys()))
+    print()
+
+    for key in data.keys():
+        print(f"===== {key} =====")
+
+        obj = data[key]
+
+        # Case 1: object arrays (e.g., list of polylines, dictionaries)
+        if obj.dtype == object:
+            obj = obj.item() if obj.size == 1 else obj
+            print(type(obj))
+            # print(obj)
+            print(obj.keys() if isinstance(obj, dict) else f"len: {len(obj)}")
+            print()
+
+        # Case 2: numpy ndarrays
+        else:
+            print("type:", type(obj))
+            print("shape:", obj.shape)
+            # print(obj)
+            print()
+
+    print("---- Done ----")
+
+if __name__ == "__main__":
+        
+    # dense_dir = Path("/workspace/SuperMapNet/evaluation/60_30_ckpt_29/visualization")
+    # base_dir  = Path("/workspace/SuperMapNet/evaluation/120_30_ckpt_29/visualization")
+
+    # create_gifs(dense_dir)
+    # create_gifs(base_dir)
+
+    # out_dir = Path("/workspace/SuperMapNet/evaluation/compare_60v120")
+    # out_dir.mkdir(parents=True, exist_ok=True)
+    # create_comparison_images(dense_dir, base_dir, out_dir)
+
+    results_dir = Path("/workspace/SuperMapNet/evaluation/60_30_ckpt_29/results/")
+    for i in range(100):  # 0..99 inclusive
+        fname = f"sample_{i}_0.npz"
+        result_name = results_dir / fname
+        if not result_name.exists():
+            print(f"Missing: {result_name}")    
+        load_npz_verbose(result_name)
+        break
